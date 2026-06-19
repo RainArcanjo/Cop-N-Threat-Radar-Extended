@@ -1,4 +1,4 @@
-#include <plugin.h>
+ï»¿#include <plugin.h>
 #include <CRadar.h>
 #include <CPools.h>
 #include <CPed.h>
@@ -7,6 +7,9 @@
 #include <CGeneral.h>
 #include <CWorld.h>
 #include <eModelID.h>
+#include <CModelInfo.h>
+#include <CPedModelInfo.h>
+#include <ePedType.h>
 
 #include "CopBlips.h"
 #include "Settings.h"
@@ -16,7 +19,7 @@ using namespace plugin;
 void CopBlips::Initialise(const Settings& cfg, const BlipRenderer& r) {
     m_cfg = &cfg;
     m_rdr = &r;
-    m_aliveCopsOnVeh.reserve(16); // OPT: evita realocações
+    m_aliveCopsOnVeh.reserve(16); // OPT: evita realocaï¿½ï¿½es
 }
 
 void CopBlips::Shutdown() {
@@ -28,20 +31,14 @@ void CopBlips::Shutdown() {
 
 void CopBlips::OnSettingsChanged(const Settings& cfg) { m_cfg = &cfg; }
 
-bool CopBlips::IsCopModel(int m) {
-    switch (m) {
-    case MODEL_LAPD1:
-    case MODEL_SFPD1:
-    case MODEL_LVPD1:
-    case MODEL_CSHER:
-    case MODEL_LAPDM1:
-    case MODEL_SWAT:
-    case MODEL_FBI:
-    case MODEL_ARMY:
-    case MODEL_DSHER:
-        return true;
-    default: return false;
-    }
+bool CopBlips::IsCopModel(int modelIndex) {
+    // Le o PedType do modelo via CPedModelInfo.
+    // Qualquer ped adicionado por mods com flag COP no ped.ide
+    // tera m_nPedType == PED_TYPE_COP e sera detectado automaticamente.
+    if (!CModelInfo::IsPedModel(modelIndex)) return false;
+    const auto* pedInfo = reinterpret_cast<const CPedModelInfo*>(
+        CModelInfo::GetModelInfo(modelIndex));
+    return pedInfo && pedInfo->m_nPedType == PED_TYPE_COP;
 }
 
 inline bool CopBlips::IsSpecialVehicle(const CVehicle* v) noexcept {
@@ -92,7 +89,7 @@ void CopBlips::DrawCopPeds() {
 
     const CVector playerPos = FindPlayerCentreOfWorld_NoInteriorShift(0);
 
-    // OPT: percorre pool 1x; conta cops vivos em veículos especiais e desenha cops a pé
+    // OPT: percorre pool 1x; conta cops vivos em veï¿½culos especiais e desenha cops a pï¿½
     const int n = CPools::ms_pPedPool->m_nSize;
     for (int i = n; i; --i) {
         CPed* ped = CPools::ms_pPedPool->GetAt(i - 1);
@@ -100,10 +97,10 @@ void CopBlips::DrawCopPeds() {
 
         if (ped->bInVehicle) {
             if (IsSpecialVehicle(ped->m_pVehicle)) {
-                // conta quantos cops vivos estão neste veículo (para PREDATOR)
+                // conta quantos cops vivos estï¿½o neste veï¿½culo (para PREDATOR)
                 m_aliveCopsOnVeh[ped->m_pVehicle] += 1;
             }
-            continue; // não desenha ped a pé se está em veículo
+            continue; // nï¿½o desenha ped a pï¿½ se estï¿½ em veï¿½culo
         }
 
         // Escolha do sprite por altura relativa ao player
@@ -117,7 +114,7 @@ void CopBlips::DrawCopPeds() {
             m_cfg->m_nCopPedBlinkMs, m_cfg->m_nBlinkJitterMs,
             HashSeedFast(ped));
 
-        // Desenha (sem rotação para pedestre)
+        // Desenha (sem rotaï¿½ï¿½o para pedestre)
         m_rdr->DrawSprite(
             spriteId,
             ped->GetPosition(),
@@ -132,7 +129,7 @@ void CopBlips::DrawCopPeds() {
 void CopBlips::DrawCopVehicles() {
     if (!m_cfg || !m_rdr) return;
 
-    // OPT: Ângulo de rotação calculado 1x por frame e reaproveitado
+    // OPT: ï¿½ngulo de rotaï¿½ï¿½o calculado 1x por frame e reaproveitado
     const float ang = SpinAngleRPM(180.0f) + (float)M_PI;
 
     const int n = CPools::ms_pVehiclePool->m_nSize;
@@ -146,7 +143,7 @@ void CopBlips::DrawCopVehicles() {
             m_cfg->m_nCopVehBlinkMs, m_cfg->m_nBlinkJitterMs, HashSeedFast(veh)
         );
 
-        // Helicóptero da polícia
+        // Helicï¿½ptero da polï¿½cia
         if (veh->m_nModelIndex == MODEL_POLMAV) {
             m_rdr->DrawSprite(
                 BlipRenderer::Id::Heli,
@@ -157,7 +154,7 @@ void CopBlips::DrawCopVehicles() {
             continue;
         }
 
-        // PREDATOR: só se ainda houver policial vivo no barco (contado no DrawCopPeds)
+        // PREDATOR: sï¿½ se ainda houver policial vivo no barco (contado no DrawCopPeds)
         if (veh->m_nModelIndex == MODEL_PREDATOR) {
             const auto it = m_aliveCopsOnVeh.find(veh);
             const int alive = (it == m_aliveCopsOnVeh.end()) ? 0 : it->second;
